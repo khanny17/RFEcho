@@ -15,45 +15,54 @@
 
 char inputBuffer[BUFFER_SIZE + 1]; //will hold a 32 bit binary string, plus a null terminator
 int bufferIndex = 0; //
-RCSwitch mySwitch = RCSwitch();
+RCSwitch tx = RCSwitch();
+RCSwitch rx = RCSwitch();
 
 void setup() {
   Serial.begin(9600);
   inputBuffer[BUFFER_SIZE] = 0; //Null terminator for the buffer
   
-  mySwitch.enableReceive(0);  // Receiver on inerrupt 0 => that is pin #2
-  mySwitch.enableTransmit(TX_DATA_PIN);  // Using Pin #10
+  rx.enableReceive(0);  // Receiver on inerrupt 0 => that is pin #2
+  tx.enableTransmit(TX_DATA_PIN);  // Using Pin #10
 
   //Use the pin to supply power because i'm too damn lazy
   pinMode(TX_POWER_PIN, OUTPUT);
   digitalWrite(TX_POWER_PIN, HIGH);
 }
 
+char newChar;
 void loop() {
-  if (mySwitch.available()) {
+  if (rx.available()) {
     
-    int value = mySwitch.getReceivedValue();
+    int value = rx.getReceivedValue();
     
     if (value == 0) {
-      Serial.println("Unknown encoding");
+      //Serial.println("Unknown encoding");
     } else {
-      Serial.println( mySwitch.getReceivedValue() );
+      Serial.println( rx.getReceivedValue() );
     }
 
-    mySwitch.resetAvailable();
+    rx.resetAvailable();
   }
 
   if(Serial.available()) {
-    inputBuffer[bufferIndex] = Serial.read();
-    ++bufferIndex; //We count down because we receive the bytes backwards
-    //Check if buffer is full
-    if(bufferIndex >= BUFFER_SIZE) {
-      //buffer is full, we have a full message to relay
-                         
-      mySwitch.send(inputBuffer);
-      bufferIndex = 0; //reset index to the end of the buffer
-      Serial.print("Message Sent: ");
-      Serial.println(inputBuffer);
+    newChar = Serial.read();
+    //Check for a ping - aka server trying to find us
+    if(newChar == '~'){
+        //It was a ping. Special case, just pong back
+        Serial.println("~~");
+    } else if(newChar == '1' || newChar == '0') {
+      inputBuffer[bufferIndex] = newChar; //put it in our buffer
+      ++bufferIndex; //We count down because we receive the bytes backwards
+      //Check if buffer is full
+      if(bufferIndex >= BUFFER_SIZE) {
+        //buffer is full, we have a full message to relay
+                           
+        tx.send(inputBuffer);
+        bufferIndex = 0; //reset index to the end of the buffer
+        Serial.print("Message Sent: ");
+        Serial.println(inputBuffer);
+      }
     }
   }
 }
